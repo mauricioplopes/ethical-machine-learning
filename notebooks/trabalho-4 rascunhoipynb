@@ -1,0 +1,1766 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "4af2650c-880a-4dd3-aea5-d97fefaa8335",
+   "metadata": {},
+   "source": [
+    "## Universidade Estadual de Campinas \n",
+    "## Instituto de Computação\n",
+    "# Imparcialidade\n",
+    "## MO810/MC959 - Tópicos em Inteligência Artificial\n",
+    "## Ética em Aprendizado de Máquina\n",
+    "### Prof. Marcos M. Raimundo\n",
+    "---\n",
+    "### Alunos:\n",
+    "#### Mateus Trentini RA 217290\n",
+    "#### Mauricio Pereira Lopes RA 225242\n",
+    "#### Rita Braga RA 251627\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "7d757229-7021-40c5-847d-fc0044dc0812",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# load required libraries\n",
+    "\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "import pickle\n",
+    "\n",
+    "from aif360.datasets import BinaryLabelDataset\n",
+    "from aif360.algorithms.preprocessing import Reweighing, DisparateImpactRemover\n",
+    "from aif360.algorithms.inprocessing import PrejudiceRemover\n",
+    "from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric\n",
+    "from aif360.datasets import StandardDataset\n",
+    "from aif360 import sklearn\n",
+    "\n",
+    "from sklearn.metrics import confusion_matrix\n",
+    "from sklearn.metrics import accuracy_score\n",
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "from sklearn.preprocessing import StandardScaler"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "bad563d3-1157-4699-ba2a-9827316e5c71",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Unnamed: 0</th>\n",
+       "      <th>ID</th>\n",
+       "      <th>LIMIT_BAL</th>\n",
+       "      <th>SEX</th>\n",
+       "      <th>EDUCATION</th>\n",
+       "      <th>MARRIAGE</th>\n",
+       "      <th>AGE</th>\n",
+       "      <th>PAY_0</th>\n",
+       "      <th>PAY_2</th>\n",
+       "      <th>PAY_3</th>\n",
+       "      <th>...</th>\n",
+       "      <th>BILL_AMT4</th>\n",
+       "      <th>BILL_AMT5</th>\n",
+       "      <th>BILL_AMT6</th>\n",
+       "      <th>PAY_AMT1</th>\n",
+       "      <th>PAY_AMT2</th>\n",
+       "      <th>PAY_AMT3</th>\n",
+       "      <th>PAY_AMT4</th>\n",
+       "      <th>PAY_AMT5</th>\n",
+       "      <th>PAY_AMT6</th>\n",
+       "      <th>default payment next month</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>27623</td>\n",
+       "      <td>27623</td>\n",
+       "      <td>50000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2</td>\n",
+       "      <td>23</td>\n",
+       "      <td>-1</td>\n",
+       "      <td>-1</td>\n",
+       "      <td>-1</td>\n",
+       "      <td>...</td>\n",
+       "      <td>4800</td>\n",
+       "      <td>9810</td>\n",
+       "      <td>660</td>\n",
+       "      <td>2548</td>\n",
+       "      <td>2321</td>\n",
+       "      <td>4800</td>\n",
+       "      <td>9810</td>\n",
+       "      <td>660</td>\n",
+       "      <td>2980</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>28377</td>\n",
+       "      <td>28377</td>\n",
+       "      <td>50000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>36</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>...</td>\n",
+       "      <td>47956</td>\n",
+       "      <td>43578</td>\n",
+       "      <td>35126</td>\n",
+       "      <td>0</td>\n",
+       "      <td>4700</td>\n",
+       "      <td>0</td>\n",
+       "      <td>2004</td>\n",
+       "      <td>3500</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>10918</td>\n",
+       "      <td>10918</td>\n",
+       "      <td>200000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>3</td>\n",
+       "      <td>1</td>\n",
+       "      <td>54</td>\n",
+       "      <td>6</td>\n",
+       "      <td>5</td>\n",
+       "      <td>4</td>\n",
+       "      <td>...</td>\n",
+       "      <td>102549</td>\n",
+       "      <td>101400</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>27235</td>\n",
+       "      <td>27235</td>\n",
+       "      <td>240000</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1</td>\n",
+       "      <td>35</td>\n",
+       "      <td>-1</td>\n",
+       "      <td>-1</td>\n",
+       "      <td>-1</td>\n",
+       "      <td>...</td>\n",
+       "      <td>17102</td>\n",
+       "      <td>13367</td>\n",
+       "      <td>22659</td>\n",
+       "      <td>2017</td>\n",
+       "      <td>21817</td>\n",
+       "      <td>1120</td>\n",
+       "      <td>13434</td>\n",
+       "      <td>22772</td>\n",
+       "      <td>22820</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>15172</td>\n",
+       "      <td>15172</td>\n",
+       "      <td>60000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2</td>\n",
+       "      <td>23</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>8549</td>\n",
+       "      <td>7635</td>\n",
+       "      <td>12258</td>\n",
+       "      <td>3126</td>\n",
+       "      <td>1392</td>\n",
+       "      <td>5033</td>\n",
+       "      <td>3601</td>\n",
+       "      <td>5200</td>\n",
+       "      <td>3647</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>5 rows × 26 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   Unnamed: 0     ID  LIMIT_BAL  SEX  EDUCATION  MARRIAGE  AGE  PAY_0  PAY_2  \\\n",
+       "0       27623  27623      50000    2          1         2   23     -1     -1   \n",
+       "1       28377  28377      50000    2          2         1   36      2      2   \n",
+       "2       10918  10918     200000    2          3         1   54      6      5   \n",
+       "3       27235  27235     240000    1          1         1   35     -1     -1   \n",
+       "4       15172  15172      60000    2          1         2   23      0      0   \n",
+       "\n",
+       "   PAY_3  ...  BILL_AMT4  BILL_AMT5  BILL_AMT6  PAY_AMT1  PAY_AMT2  PAY_AMT3  \\\n",
+       "0     -1  ...       4800       9810        660      2548      2321      4800   \n",
+       "1      2  ...      47956      43578      35126         0      4700         0   \n",
+       "2      4  ...     102549     101400          0         0         0         0   \n",
+       "3     -1  ...      17102      13367      22659      2017     21817      1120   \n",
+       "4      0  ...       8549       7635      12258      3126      1392      5033   \n",
+       "\n",
+       "   PAY_AMT4  PAY_AMT5  PAY_AMT6  default payment next month  \n",
+       "0      9810       660      2980                           0  \n",
+       "1      2004      3500         0                           0  \n",
+       "2         0         0         0                           0  \n",
+       "3     13434     22772     22820                           0  \n",
+       "4      3601      5200      3647                           0  \n",
+       "\n",
+       "[5 rows x 26 columns]"
+      ]
+     },
+     "execution_count": 2,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# load datasets\n",
+    "\n",
+    "df_train = pd.read_excel(\"../data/processed/train_data.xlsx\")\n",
+    "df_val = pd.read_excel(\"../data/processed/validation_data.xlsx\")\n",
+    "df_test = pd.read_excel(\"../data/processed/test_data.xlsx\")\n",
+    "df_train.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8c215a18-8f56-4f28-9489-87107dd0d2f1",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "# Enuncie e apresente uma ou mais métricas de imparcialidade mais ajustadas à aplicação escolhida, justifique."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2dd240a8-2c5a-4869-9a85-109d7b467c13",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## Measuring Fairness Using Equal Opportunity"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "55af8b4e-2972-4e32-b15e-6c53e58f637e",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "c:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\sklearn\\base.py:347: InconsistentVersionWarning: Trying to unpickle estimator DecisionTreeClassifier from version 1.3.1 when using version 1.3.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:\n",
+      "https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations\n",
+      "  warnings.warn(\n",
+      "c:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\sklearn\\base.py:347: InconsistentVersionWarning: Trying to unpickle estimator RandomForestClassifier from version 1.3.1 when using version 1.3.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:\n",
+      "https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations\n",
+      "  warnings.warn(\n"
+     ]
+    }
+   ],
+   "source": [
+    "# load trained model\n",
+    "rf_model = pickle.load(open('../models/best_rf.pkl', 'rb'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "1dd60a37-25d8-463f-9503-6c7b5bc4cbd3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# predict on validation dataset\n",
+    "X_val = df_val.drop(columns=['Unnamed: 0', 'ID', 'default payment next month'])\n",
+    "# Random Forest model's prediction\n",
+    "y_hat_rf = rf_model.predict(X_val)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "d49ca258-a095-440b-91bb-220c40683909",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def equal_opp(df_val, y_pred, y_val, priv_class, unpriv_class, sensitive_attribute_name):\n",
+    "    \n",
+    "    # create new datafrane with sensitive attributes, predictions for each model and ground truth\n",
+    "    y_hat_vs_y_val = pd.DataFrame({sensitive_attribute_name: df_val[sensitive_attribute_name],\n",
+    "                                   'y_hat_rf': y_pred, \n",
+    "                                   'y_val': y_val})\n",
+    "    \n",
+    "    # Separate data by sex\n",
+    "    privileged = y_hat_vs_y_val[y_hat_vs_y_val[sensitive_attribute_name] == priv_class]\n",
+    "    unprivileged = y_hat_vs_y_val[y_hat_vs_y_val[sensitive_attribute_name] == unpriv_class]\n",
+    "    \n",
+    "    # Calculate confusion matrices for each group\n",
+    "    privileged_matrix = confusion_matrix(privileged.y_hat_rf, privileged.y_val)\n",
+    "    unprivileged_matrix = confusion_matrix(unprivileged.y_hat_rf, unprivileged.y_val)\n",
+    "    \n",
+    "    # Calculate true positive rates for each group\n",
+    "    privileged_tpr = privileged_matrix[1,1] / (privileged_matrix[1,0] + privileged_matrix[1,1])\n",
+    "    unprivileged_tpr = unprivileged_matrix[1,1] / (unprivileged_matrix[1,0] + unprivileged_matrix[1,1])\n",
+    "    equal_opp_metric = privileged_tpr - unprivileged_tpr\n",
+    "\n",
+    "    return privileged_tpr, unprivileged_tpr, equal_opp_metric"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "800871e5-148b-4124-8cfb-24fd90cfc507",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "male_tpr, female_tpr, equal_opp_metric = equal_opp(df_val,\n",
+    "                                                   y_hat_rf,\n",
+    "                                                   df_val['default payment next month'],\n",
+    "                                                   1,\n",
+    "                                                   2,\n",
+    "                                                   'SEX')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "b3f6621b-6678-4a77-be0d-dbc382c3d643",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Random Forest model: The algorithm has Equal Opportunity for both groups (male vs female).\n",
+      "\n",
+      "True Positive Rates:\n",
+      "Male: 0.621\n",
+      "Female: 0.667\n",
+      "Equal Opportunity Metric: -0.046\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Compare true positive rates to assess fairness\n",
+    "if equal_opp_metric:\n",
+    "    print(\"Random Forest model: The algorithm has Equal Opportunity for both groups (male vs female).\")\n",
+    "else:\n",
+    "    print(\"Random Forest model: The algorithm does not have Equal Opportunity for both groups (male vs female).\")\n",
+    "\n",
+    "# Output true positive rates\n",
+    "print(\"\\nTrue Positive Rates:\")\n",
+    "print(\"Male: {:.3f}\".format(male_tpr))\n",
+    "print(\"Female: {:.3f}\".format(female_tpr))\n",
+    "print('Equal Opportunity Metric: {:.3f}'.format(equal_opp_metric))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f47ee3a2-f17e-4457-bf07-6998b6b5c589",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## Disparate impact"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "id": "503fe384-044e-4694-93c2-a8aa0d5a1241",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# calculating DI manually\n",
+    "\n",
+    "def calc_prop(data, group_col, group, output_col, output_val):\n",
+    "    new = data[data[group_col] == group]\n",
+    "    return len(new[new[output_col] == output_val])/len(new)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 57,
+   "id": "1bee4dc7-0627-4950-bdc8-5977cf77d993",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "parity_rate_male: 0.7529705323193916\n",
+      "parity_rate_female: 0.4723458359821996\n",
+      "parity rate ration female/male: 0.6273098557087252\n"
+     ]
+    }
+   ],
+   "source": [
+    "parity_rate_male = calc_prop(df_train, \"SEX\", 1, \"default payment next month\", 0)\n",
+    "parity_rate_female = calc_prop(df_train, \"SEX\", 2, \"default payment next month\", 0)\n",
+    "print(\"parity_rate_male:\", parity_rate_male)\n",
+    "print(\"parity_rate_female:\", parity_rate_female)\n",
+    "print(\"parity rate ration female/male:\", parity_rate_female/parity_rate_male)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "2b343117-892d-4c4e-97f3-89aa06d7e4cd",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Disparate Impact: 1.049006291146233\n"
+     ]
+    }
+   ],
+   "source": [
+    "# calculating DI using AIF360\n",
+    "\n",
+    "privileged_groups = [{'SEX': 1}]\n",
+    "unprivileged_groups = [{'SEX': 2}]\n",
+    "\n",
+    "binary_label_dataset_original = BinaryLabelDataset(df=df_train, \n",
+    "                                        label_names=['default payment next month'], \n",
+    "                                        protected_attribute_names=['SEX'],\n",
+    "                                        favorable_label=0, # non-default\n",
+    "                                        unfavorable_label=1, # default label\n",
+    "                                        )\n",
+    "\n",
+    "di = BinaryLabelDatasetMetric(binary_label_dataset_original,\n",
+    "                              unprivileged_groups = unprivileged_groups,\n",
+    "                              privileged_groups = privileged_groups\n",
+    "                             ).disparate_impact()\n",
+    "\n",
+    "print(\"Disparate Impact:\", di)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Ajuste dos dados\n",
+    "\n",
+    "Como vimos, não há imparcialidade significativa nos dados como estão, assim, por motivos educacionais, mudamos a distribuição de resultados positivos para mulheres de forma que obtenham menos resultados positivos."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>ID</th>\n",
+       "      <th>LIMIT_BAL</th>\n",
+       "      <th>SEX</th>\n",
+       "      <th>EDUCATION</th>\n",
+       "      <th>MARRIAGE</th>\n",
+       "      <th>AGE</th>\n",
+       "      <th>PAY_0</th>\n",
+       "      <th>PAY_2</th>\n",
+       "      <th>PAY_3</th>\n",
+       "      <th>PAY_4</th>\n",
+       "      <th>...</th>\n",
+       "      <th>BILL_AMT4</th>\n",
+       "      <th>BILL_AMT5</th>\n",
+       "      <th>BILL_AMT6</th>\n",
+       "      <th>PAY_AMT1</th>\n",
+       "      <th>PAY_AMT2</th>\n",
+       "      <th>PAY_AMT3</th>\n",
+       "      <th>PAY_AMT4</th>\n",
+       "      <th>PAY_AMT5</th>\n",
+       "      <th>PAY_AMT6</th>\n",
+       "      <th>default payment next month</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>15926</td>\n",
+       "      <td>30000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>31</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>...</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>10063</td>\n",
+       "      <td>200000</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>31</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>28170</td>\n",
+       "      <td>28763</td>\n",
+       "      <td>28453</td>\n",
+       "      <td>3019</td>\n",
+       "      <td>6</td>\n",
+       "      <td>991</td>\n",
+       "      <td>1032</td>\n",
+       "      <td>1310</td>\n",
+       "      <td>2000</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>19377</td>\n",
+       "      <td>500000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>4</td>\n",
+       "      <td>2</td>\n",
+       "      <td>38</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>-2</td>\n",
+       "      <td>...</td>\n",
+       "      <td>40626</td>\n",
+       "      <td>9255</td>\n",
+       "      <td>8659</td>\n",
+       "      <td>2265</td>\n",
+       "      <td>24905</td>\n",
+       "      <td>40827</td>\n",
+       "      <td>30844</td>\n",
+       "      <td>8695</td>\n",
+       "      <td>3532</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6385</td>\n",
+       "      <td>20000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>22</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>20055</td>\n",
+       "      <td>19606</td>\n",
+       "      <td>19925</td>\n",
+       "      <td>1298</td>\n",
+       "      <td>1909</td>\n",
+       "      <td>1666</td>\n",
+       "      <td>5000</td>\n",
+       "      <td>703</td>\n",
+       "      <td>775</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>15977</td>\n",
+       "      <td>50000</td>\n",
+       "      <td>2</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>48</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>19378</td>\n",
+       "      <td>18874</td>\n",
+       "      <td>19361</td>\n",
+       "      <td>0</td>\n",
+       "      <td>2000</td>\n",
+       "      <td>1500</td>\n",
+       "      <td>1000</td>\n",
+       "      <td>2000</td>\n",
+       "      <td>1000</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>5 rows × 25 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "      ID  LIMIT_BAL  SEX  EDUCATION  MARRIAGE  AGE  PAY_0  PAY_2  PAY_3  \\\n",
+       "0  15926      30000    2          2         2   31     -2     -2     -2   \n",
+       "1  10063     200000    1          2         1   31      1      2      2   \n",
+       "2  19377     500000    2          4         2   38     -2     -2     -2   \n",
+       "3   6385      20000    2          2         2   22      0      0      0   \n",
+       "4  15977      50000    2          2         1   48      1      2      0   \n",
+       "\n",
+       "   PAY_4  ...  BILL_AMT4  BILL_AMT5  BILL_AMT6  PAY_AMT1  PAY_AMT2  PAY_AMT3  \\\n",
+       "0     -2  ...          0          0          0         0         0         0   \n",
+       "1      0  ...      28170      28763      28453      3019         6       991   \n",
+       "2     -2  ...      40626       9255       8659      2265     24905     40827   \n",
+       "3      0  ...      20055      19606      19925      1298      1909      1666   \n",
+       "4      0  ...      19378      18874      19361         0      2000      1500   \n",
+       "\n",
+       "   PAY_AMT4  PAY_AMT5  PAY_AMT6  default payment next month  \n",
+       "0         0         0         0                           0  \n",
+       "1      1032      1310      2000                           0  \n",
+       "2     30844      8695      3532                           1  \n",
+       "3      5000       703       775                           0  \n",
+       "4      1000      2000      1000                           1  \n",
+       "\n",
+       "[5 rows x 25 columns]"
+      ]
+     },
+     "execution_count": 51,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# load datasets\n",
+    "\n",
+    "df_train = pd.read_excel(\"../data/processed/train_unfair.xlsx\")\n",
+    "df_val = pd.read_excel(\"../data/processed/validation_unfair.xlsx\")\n",
+    "df_test = pd.read_excel(\"../data/processed/test_unfair.xlsx\")\n",
+    "df_train.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 52,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# load trained model\n",
+    "rf_model = pickle.load(open('../models/best_rf_unf.pkl', 'rb'))\n",
+    "#logreg_model = pickle.load(open('../models/best_logreg_unf.pkl', 'rb'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 53,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# predict on validation dataset\n",
+    "X_val = df_val.drop(columns=['ID', 'default payment next month'])\n",
+    "# Random Forest model's prediction\n",
+    "y_hat_rf = rf_model.predict(X_val)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 49,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "male_tpr, female_tpr, equal_opp_metric = equal_opp(df_val,\n",
+    "                                                   y_hat_rf,\n",
+    "                                                   df_val['default payment next month'],\n",
+    "                                                   1,\n",
+    "                                                   2,\n",
+    "                                                   'SEX')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Random Forest model: The algorithm has Equal Opportunity for both groups (male vs female).\n",
+      "\n",
+      "True Positive Rates:\n",
+      "Male: 0.776\n",
+      "Female: 0.556\n",
+      "Equal Opportunity Metric: 0.220\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Compare true positive rates to assess fairness\n",
+    "if equal_opp_metric:\n",
+    "    print(\"Random Forest model: The algorithm has Equal Opportunity for both groups (male vs female).\")\n",
+    "else:\n",
+    "    print(\"Random Forest model: The algorithm does not have Equal Opportunity for both groups (male vs female).\")\n",
+    "\n",
+    "# Output true positive rates\n",
+    "print(\"\\nTrue Positive Rates:\")\n",
+    "print(\"Male: {:.3f}\".format(male_tpr))\n",
+    "print(\"Female: {:.3f}\".format(female_tpr))\n",
+    "print('Equal Opportunity Metric: {:.3f}'.format(equal_opp_metric))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## Disparate impact"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 45,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# calculating DI manually\n",
+    "\n",
+    "def calc_prop(data, group_col, group, output_col, output_val):\n",
+    "    new = data[data[group_col] == group]\n",
+    "    return len(new[new[output_col] == output_val])/len(new)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "parity_rate_male: 0.7529705323193916\n",
+      "parity_rate_female: 0.4723458359821996\n",
+      "parity rate ration female/male: 0.6273098557087252\n"
+     ]
+    }
+   ],
+   "source": [
+    "parity_rate_male = calc_prop(df_train, \"SEX\", 1, \"default payment next month\", 0)\n",
+    "parity_rate_female = calc_prop(df_train, \"SEX\", 2, \"default payment next month\", 0)\n",
+    "print(\"parity_rate_male:\", parity_rate_male)\n",
+    "print(\"parity_rate_female:\", parity_rate_female)\n",
+    "print(\"parity rate ration female/male:\", parity_rate_female/parity_rate_male)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 60,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Disparate Impact: 0.6273098557087252\n"
+     ]
+    }
+   ],
+   "source": [
+    "# calculating DI using AIF360\n",
+    "\n",
+    "privileged_groups = [{'SEX': 1}]\n",
+    "unprivileged_groups = [{'SEX': 2}]\n",
+    "\n",
+    "binary_label_dataset_original = BinaryLabelDataset(df=df_train, \n",
+    "                                        label_names=['default payment next month'], \n",
+    "                                        protected_attribute_names=['SEX'],\n",
+    "                                        favorable_label=0, # non-default\n",
+    "                                        unfavorable_label=1, # default label\n",
+    "                                        )\n",
+    "\n",
+    "di = BinaryLabelDatasetMetric(binary_label_dataset_original,\n",
+    "                              unprivileged_groups = unprivileged_groups,\n",
+    "                              privileged_groups = privileged_groups\n",
+    "                             ).disparate_impact()\n",
+    "\n",
+    "print(\"Disparate Impact:\", di)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Average Odds Difference"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 74,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Average Odds Difference: -0.11194134394931593\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Convert the dataset into a binary label dataset\n",
+    "binary_label_dataset_original = BinaryLabelDataset(df=df_val, \n",
+    "                                        label_names=['default payment next month'], \n",
+    "                                        protected_attribute_names=['SEX'],\n",
+    "                                        favorable_label=0, # non-default\n",
+    "                                        unfavorable_label=1, # default label\n",
+    "                                        )\n",
+    "\n",
+    "\n",
+    "binary_label_dataset_predicted = binary_label_dataset_original.copy()\n",
+    "\n",
+    "# Assume that the predicted labels of the model are stored in the array y_pred\n",
+    "binary_label_dataset_predicted.labels = y_hat_rf\n",
+    "\n",
+    "# Calculate the classification metric\n",
+    "classified_metric_orig_training = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                                       binary_label_dataset_predicted, \n",
+    "                                                       unprivileged_groups=unprivileged_groups,\n",
+    "                                                       privileged_groups=privileged_groups)\n",
+    "\n",
+    "# Calculate the Average Odds Difference\n",
+    "aod = classified_metric_orig_training.average_odds_difference()\n",
+    "\n",
+    "print(\"Average Odds Difference:\", aod)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "fba70309-8938-47af-a20b-f9c610fa5413",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "# Aplique duas metodologias de pré-processamento mais adequadas à aplicação escolhida.\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Reweighing\n",
+    "\n",
+    "O método de Reweighing atribui pesos a cada exemplo no conjunto de dados de treinamento de tal forma que as distribuições estatísticas dos atributos protegidos sejam equivalentes para os resultados favoráveis e desfavoráveis."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 69,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from aif360.algorithms.preprocessing import Reweighing\n",
+    "\n",
+    "# Convert the dataset into a binary label dataset\n",
+    "binary_label_dataset_train = BinaryLabelDataset(df=df_train, \n",
+    "                                                label_names=['default payment next month'], \n",
+    "                                                protected_attribute_names=['SEX'],\n",
+    "                                                favorable_label=0, \n",
+    "                                                unfavorable_label=1)\n",
+    "\n",
+    "# Initialize the reweighing algorithm\n",
+    "rw = Reweighing(unprivileged_groups=unprivileged_groups,\n",
+    "                privileged_groups=privileged_groups)\n",
+    "\n",
+    "# Fit and transform the dataset\n",
+    "binary_label_dataset_train_rw = rw.fit_transform(binary_label_dataset_train)\n",
+    "\n",
+    "# Update the training dataframe with the new weights\n",
+    "df_train_rw = binary_label_dataset_train_rw.convert_to_dataframe()[0]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Disparate Impact Remover\n",
+    "\n",
+    "O Disparate Impact Remover modifica os valores dos atributos não protegidos de forma a remover o impacto desigual nos atributos protegidos."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 70,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from aif360.algorithms.preprocessing import DisparateImpactRemover\n",
+    "\n",
+    "# Initialize the Disparate Impact Remover algorithm\n",
+    "dir = DisparateImpactRemover(repair_level=1.0)\n",
+    "\n",
+    "# Fit and transform the dataset\n",
+    "binary_label_dataset_train_dir = dir.fit_transform(binary_label_dataset_train)\n",
+    "\n",
+    "# Update the training dataframe with the modified features\n",
+    "df_train_dir = binary_label_dataset_train_dir.convert_to_dataframe()[0]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Comparando"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 71,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Reweighing - Disparate Impact:  0.6227331426269521\n",
+      "Reweighing - Average Odds Difference:  -0.2274165762377136\n",
+      "Disparate Impact Remover - Disparate Impact:  0.6724256472073559\n",
+      "Disparate Impact Remover - Average Odds Difference:  -0.18349826162370242\n"
+     ]
+    }
+   ],
+   "source": [
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "from aif360.metrics import BinaryLabelDatasetMetric, ClassificationMetric\n",
+    "\n",
+    "# Prepare the training data\n",
+    "X_train_rw = df_train.drop(columns=['ID', 'default payment next month'])\n",
+    "y_train_rw = df_train['default payment next month']\n",
+    "\n",
+    "X_train_dir = df_train_dir.drop(columns=['ID', 'default payment next month'])\n",
+    "y_train_dir = df_train_dir['default payment next month']\n",
+    "\n",
+    "# Train the models\n",
+    "rf_model_rw = RandomForestClassifier()\n",
+    "rf_model_rw.fit(X_train_rw, y_train_rw)\n",
+    "\n",
+    "rf_model_dir = RandomForestClassifier()\n",
+    "rf_model_dir.fit(X_train_dir, y_train_dir)\n",
+    "\n",
+    "# Predict on the validation dataset\n",
+    "y_hat_rw = rf_model_rw.predict(X_val)\n",
+    "y_hat_dir = rf_model_dir.predict(X_val)\n",
+    "\n",
+    "# Convert the predicted datasets into binary label datasets\n",
+    "binary_label_dataset_predicted_rw = binary_label_dataset_original.copy()\n",
+    "binary_label_dataset_predicted_rw.labels = y_hat_rw\n",
+    "\n",
+    "binary_label_dataset_predicted_dir = binary_label_dataset_original.copy()\n",
+    "binary_label_dataset_predicted_dir.labels = y_hat_dir\n",
+    "\n",
+    "# Calculate the classification metrics\n",
+    "classified_metric_rw = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                            binary_label_dataset_predicted_rw, \n",
+    "                                            unprivileged_groups=unprivileged_groups,\n",
+    "                                            privileged_groups=privileged_groups)\n",
+    "\n",
+    "classified_metric_dir = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                             binary_label_dataset_predicted_dir, \n",
+    "                                             unprivileged_groups=unprivileged_groups,\n",
+    "                                             privileged_groups=privileged_groups)\n",
+    "\n",
+    "# Calculate the Disparate Impact and Average Odds Difference\n",
+    "di_rw = BinaryLabelDatasetMetric(binary_label_dataset_predicted_rw,\n",
+    "                                 unprivileged_groups=unprivileged_groups,\n",
+    "                                 privileged_groups=privileged_groups\n",
+    "                                ).disparate_impact()\n",
+    "\n",
+    "di_dir = BinaryLabelDatasetMetric(binary_label_dataset_predicted_dir,\n",
+    "                                  unprivileged_groups=unprivileged_groups,\n",
+    "                                  privileged_groups=privileged_groups\n",
+    "                                 ).disparate_impact()\n",
+    "\n",
+    "aod_rw = classified_metric_rw.average_odds_difference()\n",
+    "aod_dir = classified_metric_dir.average_odds_difference()\n",
+    "\n",
+    "print(\"Reweighing - Disparate Impact: \", di_rw)\n",
+    "print(\"Reweighing - Average Odds Difference: \", aod_rw)\n",
+    "print(\"Disparate Impact Remover - Disparate Impact: \", di_dir)\n",
+    "print(\"Disparate Impact Remover - Average Odds Difference: \", aod_dir)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "06a22695-c9a7-41a3-8fe4-0236fee4b30e",
+   "metadata": {},
+   "source": [
+    "***Notamos que Disparate Impact Remover teve o maior impacto, torando DI mais próximo de 1 e AOD mais próximo de 0***"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6c9074ad-39fc-488d-ab2f-31e5d653c009",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "# Aplique duas metodologias de processamento mais adequadas à aplicação escolhida.\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "702111ba-8c4b-4181-82e2-6c670816f31d",
+   "metadata": {},
+   "source": [
+    "## Adversarial Debiasing"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 85,
+   "id": "127abf40-79e6-4e9c-9c0e-700ac4ec7aba",
+   "metadata": {},
+   "outputs": [
+    {
+     "ename": "NameError",
+     "evalue": "name 'tf' is not defined",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[1;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[1;31mNameError\u001b[0m                                 Traceback (most recent call last)",
+      "\u001b[1;32mc:\\Users\\mateu\\OneDrive\\Documentos\\estat\\MC956\\ethical-machine-learning\\notebooks\\trabalho-4 v3.ipynb Cell 37\u001b[0m line \u001b[0;36m1\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=10'>11</a>\u001b[0m adv_debias \u001b[39m=\u001b[39m AdversarialDebiasing(privileged_groups\u001b[39m=\u001b[39mprivileged_groups,\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=11'>12</a>\u001b[0m                                   unprivileged_groups\u001b[39m=\u001b[39munprivileged_groups,\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=12'>13</a>\u001b[0m                                   scope_name\u001b[39m=\u001b[39m\u001b[39m\"\u001b[39m\u001b[39mdebiased_classifier\u001b[39m\u001b[39m\"\u001b[39m,\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=13'>14</a>\u001b[0m                                   debias\u001b[39m=\u001b[39m\u001b[39mTrue\u001b[39;00m,\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=14'>15</a>\u001b[0m                                   sess\u001b[39m=\u001b[39msess)\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=16'>17</a>\u001b[0m \u001b[39m# Treinar o modelo Adversarial Debiasing\u001b[39;00m\n\u001b[1;32m---> <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=17'>18</a>\u001b[0m adv_debias\u001b[39m.\u001b[39mfit(binary_label_dataset_original)\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=19'>20</a>\u001b[0m \u001b[39m# Prever no conjunto de validação\u001b[39;00m\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y155sZmlsZQ%3D%3D?line=20'>21</a>\u001b[0m binary_label_dataset_predicted_adv_debias \u001b[39m=\u001b[39m adv_debias\u001b[39m.\u001b[39mpredict(binary_label_dataset_original)\n",
+      "File \u001b[1;32mc:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\aif360\\algorithms\\transformer.py:27\u001b[0m, in \u001b[0;36maddmetadata.<locals>.wrapper\u001b[1;34m(self, *args, **kwargs)\u001b[0m\n\u001b[0;32m     25\u001b[0m \u001b[39m@wraps\u001b[39m(func)\n\u001b[0;32m     26\u001b[0m \u001b[39mdef\u001b[39;00m \u001b[39mwrapper\u001b[39m(\u001b[39mself\u001b[39m, \u001b[39m*\u001b[39margs, \u001b[39m*\u001b[39m\u001b[39m*\u001b[39mkwargs):\n\u001b[1;32m---> 27\u001b[0m     new_dataset \u001b[39m=\u001b[39m func(\u001b[39mself\u001b[39m, \u001b[39m*\u001b[39margs, \u001b[39m*\u001b[39m\u001b[39m*\u001b[39mkwargs)\n\u001b[0;32m     28\u001b[0m     \u001b[39mif\u001b[39;00m \u001b[39misinstance\u001b[39m(new_dataset, Dataset):\n\u001b[0;32m     29\u001b[0m         new_dataset\u001b[39m.\u001b[39mmetadata \u001b[39m=\u001b[39m new_dataset\u001b[39m.\u001b[39mmetadata\u001b[39m.\u001b[39mcopy()\n",
+      "File \u001b[1;32mc:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\aif360\\algorithms\\inprocessing\\adversarial_debiasing.py:126\u001b[0m, in \u001b[0;36mAdversarialDebiasing.fit\u001b[1;34m(self, dataset)\u001b[0m\n\u001b[0;32m    116\u001b[0m \u001b[39mdef\u001b[39;00m \u001b[39mfit\u001b[39m(\u001b[39mself\u001b[39m, dataset):\n\u001b[0;32m    117\u001b[0m \u001b[39m    \u001b[39m\u001b[39m\"\"\"Compute the model parameters of the fair classifier using gradient\u001b[39;00m\n\u001b[0;32m    118\u001b[0m \u001b[39m    descent.\u001b[39;00m\n\u001b[0;32m    119\u001b[0m \n\u001b[1;32m   (...)\u001b[0m\n\u001b[0;32m    124\u001b[0m \u001b[39m        AdversarialDebiasing: Returns self.\u001b[39;00m\n\u001b[0;32m    125\u001b[0m \u001b[39m    \"\"\"\u001b[39;00m\n\u001b[1;32m--> 126\u001b[0m     \u001b[39mif\u001b[39;00m tf\u001b[39m.\u001b[39mexecuting_eagerly():\n\u001b[0;32m    127\u001b[0m         \u001b[39mraise\u001b[39;00m \u001b[39mRuntimeError\u001b[39;00m(\u001b[39m\"\u001b[39m\u001b[39mAdversarialDebiasing does not work in eager \u001b[39m\u001b[39m\"\u001b[39m\n\u001b[0;32m    128\u001b[0m                 \u001b[39m\"\u001b[39m\u001b[39mexecution mode. To fix, add `tf.disable_eager_execution()`\u001b[39m\u001b[39m\"\u001b[39m\n\u001b[0;32m    129\u001b[0m                 \u001b[39m\"\u001b[39m\u001b[39m to the top of the calling script.\u001b[39m\u001b[39m\"\u001b[39m)\n\u001b[0;32m    131\u001b[0m     \u001b[39mif\u001b[39;00m \u001b[39mself\u001b[39m\u001b[39m.\u001b[39mseed \u001b[39mis\u001b[39;00m \u001b[39mnot\u001b[39;00m \u001b[39mNone\u001b[39;00m:\n",
+      "\u001b[1;31mNameError\u001b[0m: name 'tf' is not defined"
+     ]
+    }
+   ],
+   "source": [
+    "from aif360.algorithms.inprocessing import AdversarialDebiasing\n",
+    "import tensorflow.compat.v1 as tf\n",
+    "\n",
+    "# Desativar o TensorFlow v2 para compatibilidade com aif360\n",
+    "tf.disable_v2_behavior()\n",
+    "\n",
+    "# Criar uma sessão do TensorFlow\n",
+    "sess = tf.Session()\n",
+    "\n",
+    "# Inicializar o Adversarial Debiasing\n",
+    "adv_debias = AdversarialDebiasing(privileged_groups=privileged_groups,\n",
+    "                                  unprivileged_groups=unprivileged_groups,\n",
+    "                                  scope_name=\"debiased_classifier\",\n",
+    "                                  debias=True,\n",
+    "                                  sess=sess)\n",
+    "\n",
+    "# Treinar o modelo Adversarial Debiasing\n",
+    "adv_debias.fit(binary_label_dataset_original)\n",
+    "\n",
+    "# Prever no conjunto de validação\n",
+    "binary_label_dataset_predicted_adv_debias = adv_debias.predict(binary_label_dataset_original)\n",
+    "\n",
+    "# Calcular métricas de imparcialidade\n",
+    "classified_metric_adv_debias = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                                     binary_label_dataset_predicted_adv_debias, \n",
+    "                                                     unprivileged_groups=unprivileged_groups,\n",
+    "                                                     privileged_groups=privileged_groups)\n",
+    "\n",
+    "di_adv_debias = BinaryLabelDatasetMetric(binary_label_dataset_predicted_adv_debias,\n",
+    "                                         unprivileged_groups=unprivileged_groups,\n",
+    "                                         privileged_groups=privileged_groups\n",
+    "                                        ).disparate_impact()\n",
+    "\n",
+    "aod_adv_debias = classified_metric_adv_debias.average_odds_difference()\n",
+    "\n",
+    "print(\"Adversarial Debiasing - Disparate Impact: \", di_adv_debias)\n",
+    "print(\"Adversarial Debiasing - Average Odds Difference: \", aod_adv_debias)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 82,
+   "id": "e3a525f4-3b14-4742-bc12-89d4223bc61d",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "c:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\aif360\\algorithms\\inprocessing\\prejudice_remover.py:208: UserWarning: loadtxt: input contained no data: \"C:\\Users\\mateu\\AppData\\Local\\Temp\\tmph0v8qaz7\"\n",
+      "  m = np.loadtxt(output_name)\n"
+     ]
+    },
+    {
+     "ename": "IndexError",
+     "evalue": "too many indices for array: array is 1-dimensional, but 2 were indexed",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[1;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[1;31mIndexError\u001b[0m                                Traceback (most recent call last)",
+      "\u001b[1;32mc:\\Users\\mateu\\OneDrive\\Documentos\\estat\\MC956\\ethical-machine-learning\\notebooks\\trabalho-4 v3.ipynb Cell 38\u001b[0m line \u001b[0;36m1\n\u001b[0;32m      <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=6'>7</a>\u001b[0m pr\u001b[39m.\u001b[39mfit(binary_label_dataset_original)\n\u001b[0;32m      <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=8'>9</a>\u001b[0m \u001b[39m# Prever no conjunto de validação\u001b[39;00m\n\u001b[1;32m---> <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=9'>10</a>\u001b[0m binary_label_dataset_predicted_pr \u001b[39m=\u001b[39m pr\u001b[39m.\u001b[39mpredict(binary_label_dataset_original)\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=11'>12</a>\u001b[0m \u001b[39m# Calcular métricas de imparcialidade\u001b[39;00m\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=12'>13</a>\u001b[0m classified_metric_pr \u001b[39m=\u001b[39m ClassificationMetric(binary_label_dataset_original,\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=13'>14</a>\u001b[0m                                             binary_label_dataset_predicted_pr, \n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=14'>15</a>\u001b[0m                                             unprivileged_groups\u001b[39m=\u001b[39munprivileged_groups,\n\u001b[0;32m     <a href='vscode-notebook-cell:/c%3A/Users/mateu/OneDrive/Documentos/estat/MC956/ethical-machine-learning/notebooks/trabalho-4%20v3.ipynb#Y156sZmlsZQ%3D%3D?line=15'>16</a>\u001b[0m                                             privileged_groups\u001b[39m=\u001b[39mprivileged_groups)\n",
+      "File \u001b[1;32mc:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\aif360\\algorithms\\transformer.py:27\u001b[0m, in \u001b[0;36maddmetadata.<locals>.wrapper\u001b[1;34m(self, *args, **kwargs)\u001b[0m\n\u001b[0;32m     25\u001b[0m \u001b[39m@wraps\u001b[39m(func)\n\u001b[0;32m     26\u001b[0m \u001b[39mdef\u001b[39;00m \u001b[39mwrapper\u001b[39m(\u001b[39mself\u001b[39m, \u001b[39m*\u001b[39margs, \u001b[39m*\u001b[39m\u001b[39m*\u001b[39mkwargs):\n\u001b[1;32m---> 27\u001b[0m     new_dataset \u001b[39m=\u001b[39m func(\u001b[39mself\u001b[39m, \u001b[39m*\u001b[39margs, \u001b[39m*\u001b[39m\u001b[39m*\u001b[39mkwargs)\n\u001b[0;32m     28\u001b[0m     \u001b[39mif\u001b[39;00m \u001b[39misinstance\u001b[39m(new_dataset, Dataset):\n\u001b[0;32m     29\u001b[0m         new_dataset\u001b[39m.\u001b[39mmetadata \u001b[39m=\u001b[39m new_dataset\u001b[39m.\u001b[39mmetadata\u001b[39m.\u001b[39mcopy()\n",
+      "File \u001b[1;32mc:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\aif360\\algorithms\\inprocessing\\prejudice_remover.py:218\u001b[0m, in \u001b[0;36mPrejudiceRemover.predict\u001b[1;34m(self, dataset)\u001b[0m\n\u001b[0;32m    211\u001b[0m pred_dataset \u001b[39m=\u001b[39m dataset\u001b[39m.\u001b[39mcopy()\n\u001b[0;32m    212\u001b[0m \u001b[39m# Columns of Outputs: (as per Kamishima implementation predict_lr.py)\u001b[39;00m\n\u001b[0;32m    213\u001b[0m \u001b[39m# 0. true sample class number\u001b[39;00m\n\u001b[0;32m    214\u001b[0m \u001b[39m# 1. predicted class number\u001b[39;00m\n\u001b[0;32m    215\u001b[0m \u001b[39m# 2. sensitive feature\u001b[39;00m\n\u001b[0;32m    216\u001b[0m \u001b[39m# 3. class 0 probability\u001b[39;00m\n\u001b[0;32m    217\u001b[0m \u001b[39m# 4. class 1 probability\u001b[39;00m\n\u001b[1;32m--> 218\u001b[0m pred_dataset\u001b[39m.\u001b[39mlabels \u001b[39m=\u001b[39m m[:, [\u001b[39m1\u001b[39m]]\n\u001b[0;32m    219\u001b[0m pred_dataset\u001b[39m.\u001b[39mscores \u001b[39m=\u001b[39m m[:, [\u001b[39m4\u001b[39m]]\n\u001b[0;32m    221\u001b[0m \u001b[39mreturn\u001b[39;00m pred_dataset\n",
+      "\u001b[1;31mIndexError\u001b[0m: too many indices for array: array is 1-dimensional, but 2 were indexed"
+     ]
+    }
+   ],
+   "source": [
+    "from aif360.algorithms.inprocessing import PrejudiceRemover\n",
+    "\n",
+    "# Inicializar o Prejudice Remover\n",
+    "pr = PrejudiceRemover(eta=25.0, sensitive_attr=\"SEX\")\n",
+    "\n",
+    "# Treinar o modelo Prejudice Remover\n",
+    "pr.fit(binary_label_dataset_original)\n",
+    "\n",
+    "# Prever no conjunto de validação\n",
+    "binary_label_dataset_predicted_pr = pr.predict(binary_label_dataset_original)\n",
+    "\n",
+    "# Calcular métricas de imparcialidade\n",
+    "classified_metric_pr = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                            binary_label_dataset_predicted_pr, \n",
+    "                                            unprivileged_groups=unprivileged_groups,\n",
+    "                                            privileged_groups=privileged_groups)\n",
+    "\n",
+    "di_pr = BinaryLabelDatasetMetric(binary_label_dataset_predicted_pr,\n",
+    "                                 unprivileged_groups=unprivileged_groups,\n",
+    "                                 privileged_groups=privileged_groups\n",
+    "                                ).disparate_impact()\n",
+    "\n",
+    "aod_pr = classified_metric_pr.average_odds_difference()\n",
+    "\n",
+    "print(\"Prejudice Remover - Disparate Impact: \", di_pr)\n",
+    "print(\"Prejudice Remover - Average Odds Difference: \", aod_pr)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "153ebc66-5879-45d3-a037-ccaed8b57b65",
+   "metadata": {},
+   "source": [
+    "### Aprendizado justo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 83,
+   "id": "effe5fbb-5af5-4943-96a2-dfa0e1f76ded",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from sklearn.model_selection import RandomizedSearchCV\n",
+    "\n",
+    "# Definir os conjuntos de treinamento e validação\n",
+    "X_train = df_train.drop(columns=['ID', 'default payment next month'])\n",
+    "y_train = df_train['default payment next month']\n",
+    "\n",
+    "X_val = df_val.drop(columns=['ID', 'default payment next month'])\n",
+    "y_val = df_val['default payment next month']\n",
+    "\n",
+    "# Definir a distribuição dos hiperparâmetros\n",
+    "param_dist = {\n",
+    "    'n_estimators': [50, 100, 200],\n",
+    "    'max_depth': [None, 10, 20, 30],\n",
+    "    'min_samples_split': [2, 5, 10],\n",
+    "    'min_samples_leaf': [1, 2, 4]\n",
+    "}\n",
+    "\n",
+    "# Criar um classificador Random Forest\n",
+    "rf_classifier = RandomForestClassifier(random_state=42)\n",
+    "\n",
+    "# Criar um objeto de busca aleatória\n",
+    "random_search = RandomizedSearchCV(rf_classifier, param_dist, cv=5, n_jobs=-1, n_iter=10)\n",
+    "\n",
+    "# Ajustar a busca aleatória aos dados de treinamento\n",
+    "random_search.fit(X_train, y_train)\n",
+    "\n",
+    "# Obter o melhor modelo Random Forest da busca aleatória\n",
+    "best_rf = random_search.best_estimator_"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 84,
+   "id": "9ad002b4-a549-4421-b101-2dfbf077a06d",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fair Learning - Disparate Impact:  0.9734947979152936\n",
+      "Fair Learning - Average Odds Difference:  0.08321807522750618\n"
+     ]
+    }
+   ],
+   "source": [
+    "from fairlearn.reductions import ExponentiatedGradient, DemographicParity\n",
+    "\n",
+    "# Define a restrição de paridade demográfica\n",
+    "dp_constraint = DemographicParity()\n",
+    "\n",
+    "# Inicializa o Aprendizado Justo com o modelo base e a restrição\n",
+    "fair_model = ExponentiatedGradient(best_rf, dp_constraint)\n",
+    "\n",
+    "# Treina o modelo\n",
+    "fair_model.fit(X_train, y_train, sensitive_features=df_train['SEX'])\n",
+    "\n",
+    "# Preve no conjunto de validação\n",
+    "y_pred_fair = fair_model.predict(X_val)\n",
+    "\n",
+    "# Calcula métricas de imparcialidade\n",
+    "binary_label_dataset_predicted_fair = binary_label_dataset_original.copy()\n",
+    "binary_label_dataset_predicted_fair.labels = y_pred_fair\n",
+    "\n",
+    "classified_metric_fair = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                              binary_label_dataset_predicted_fair, \n",
+    "                                              unprivileged_groups=unprivileged_groups,\n",
+    "                                              privileged_groups=privileged_groups)\n",
+    "\n",
+    "di_fair = BinaryLabelDatasetMetric(binary_label_dataset_predicted_fair,\n",
+    "                                   unprivileged_groups=unprivileged_groups,\n",
+    "                                   privileged_groups=privileged_groups\n",
+    "                                  ).disparate_impact()\n",
+    "\n",
+    "aod_fair = classified_metric_fair.average_odds_difference()\n",
+    "\n",
+    "print(\"Fair Learning - Disparate Impact: \", di_fair)\n",
+    "print(\"Fair Learning - Average Odds Difference: \", aod_fair)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ba88436e-7e3f-4fbb-b4f1-fc984af9d093",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "# Aplique duas metodologias de pós-processamento mais adequadas à aplicação escolhida.\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9aa5d55b-994c-4da2-b8b2-760c090d8cd8",
+   "metadata": {},
+   "source": [
+    "## Calibrated Model to Minimize Equalized Odds"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 92,
+   "id": "5d31a0c4-4d70-4bda-8b48-0dd9cd5066a9",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<style>#sk-container-id-1 {color: black;}#sk-container-id-1 pre{padding: 0;}#sk-container-id-1 div.sk-toggleable {background-color: white;}#sk-container-id-1 label.sk-toggleable__label {cursor: pointer;display: block;width: 100%;margin-bottom: 0;padding: 0.3em;box-sizing: border-box;text-align: center;}#sk-container-id-1 label.sk-toggleable__label-arrow:before {content: \"▸\";float: left;margin-right: 0.25em;color: #696969;}#sk-container-id-1 label.sk-toggleable__label-arrow:hover:before {color: black;}#sk-container-id-1 div.sk-estimator:hover label.sk-toggleable__label-arrow:before {color: black;}#sk-container-id-1 div.sk-toggleable__content {max-height: 0;max-width: 0;overflow: hidden;text-align: left;background-color: #f0f8ff;}#sk-container-id-1 div.sk-toggleable__content pre {margin: 0.2em;color: black;border-radius: 0.25em;background-color: #f0f8ff;}#sk-container-id-1 input.sk-toggleable__control:checked~div.sk-toggleable__content {max-height: 200px;max-width: 100%;overflow: auto;}#sk-container-id-1 input.sk-toggleable__control:checked~label.sk-toggleable__label-arrow:before {content: \"▾\";}#sk-container-id-1 div.sk-estimator input.sk-toggleable__control:checked~label.sk-toggleable__label {background-color: #d4ebff;}#sk-container-id-1 div.sk-label input.sk-toggleable__control:checked~label.sk-toggleable__label {background-color: #d4ebff;}#sk-container-id-1 input.sk-hidden--visually {border: 0;clip: rect(1px 1px 1px 1px);clip: rect(1px, 1px, 1px, 1px);height: 1px;margin: -1px;overflow: hidden;padding: 0;position: absolute;width: 1px;}#sk-container-id-1 div.sk-estimator {font-family: monospace;background-color: #f0f8ff;border: 1px dotted black;border-radius: 0.25em;box-sizing: border-box;margin-bottom: 0.5em;}#sk-container-id-1 div.sk-estimator:hover {background-color: #d4ebff;}#sk-container-id-1 div.sk-parallel-item::after {content: \"\";width: 100%;border-bottom: 1px solid gray;flex-grow: 1;}#sk-container-id-1 div.sk-label:hover label.sk-toggleable__label {background-color: #d4ebff;}#sk-container-id-1 div.sk-serial::before {content: \"\";position: absolute;border-left: 1px solid gray;box-sizing: border-box;top: 0;bottom: 0;left: 50%;z-index: 0;}#sk-container-id-1 div.sk-serial {display: flex;flex-direction: column;align-items: center;background-color: white;padding-right: 0.2em;padding-left: 0.2em;position: relative;}#sk-container-id-1 div.sk-item {position: relative;z-index: 1;}#sk-container-id-1 div.sk-parallel {display: flex;align-items: stretch;justify-content: center;background-color: white;position: relative;}#sk-container-id-1 div.sk-item::before, #sk-container-id-1 div.sk-parallel-item::before {content: \"\";position: absolute;border-left: 1px solid gray;box-sizing: border-box;top: 0;bottom: 0;left: 50%;z-index: -1;}#sk-container-id-1 div.sk-parallel-item {display: flex;flex-direction: column;z-index: 1;position: relative;background-color: white;}#sk-container-id-1 div.sk-parallel-item:first-child::after {align-self: flex-end;width: 50%;}#sk-container-id-1 div.sk-parallel-item:last-child::after {align-self: flex-start;width: 50%;}#sk-container-id-1 div.sk-parallel-item:only-child::after {width: 0;}#sk-container-id-1 div.sk-dashed-wrapped {border: 1px dashed gray;margin: 0 0.4em 0.5em 0.4em;box-sizing: border-box;padding-bottom: 0.4em;background-color: white;}#sk-container-id-1 div.sk-label label {font-family: monospace;font-weight: bold;display: inline-block;line-height: 1.2em;}#sk-container-id-1 div.sk-label-container {text-align: center;}#sk-container-id-1 div.sk-container {/* jupyter's `normalize.less` sets `[hidden] { display: none; }` but bootstrap.min.css set `[hidden] { display: none !important; }` so we also need the `!important` here to be able to override the default hidden behavior on the sphinx rendered scikit-learn.org. See: https://github.com/scikit-learn/scikit-learn/issues/21755 */display: inline-block !important;position: relative;}#sk-container-id-1 div.sk-text-repr-fallback {display: none;}</style><div id=\"sk-container-id-1\" class=\"sk-top-container\"><div class=\"sk-text-repr-fallback\"><pre>ThresholdOptimizer(constraints=&#x27;equalized_odds&#x27;,\n",
+       "                   estimator=RandomForestClassifier(max_depth=10,\n",
+       "                                                    min_samples_split=10,\n",
+       "                                                    n_estimators=200,\n",
+       "                                                    random_state=42),\n",
+       "                   objective=&#x27;balanced_accuracy_score&#x27;,\n",
+       "                   predict_method=&#x27;predict_proba&#x27;, prefit=True)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br />On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class=\"sk-container\" hidden><div class=\"sk-item sk-dashed-wrapped\"><div class=\"sk-label-container\"><div class=\"sk-label sk-toggleable\"><input class=\"sk-toggleable__control sk-hidden--visually\" id=\"sk-estimator-id-1\" type=\"checkbox\" ><label for=\"sk-estimator-id-1\" class=\"sk-toggleable__label sk-toggleable__label-arrow\">ThresholdOptimizer</label><div class=\"sk-toggleable__content\"><pre>ThresholdOptimizer(constraints=&#x27;equalized_odds&#x27;,\n",
+       "                   estimator=RandomForestClassifier(max_depth=10,\n",
+       "                                                    min_samples_split=10,\n",
+       "                                                    n_estimators=200,\n",
+       "                                                    random_state=42),\n",
+       "                   objective=&#x27;balanced_accuracy_score&#x27;,\n",
+       "                   predict_method=&#x27;predict_proba&#x27;, prefit=True)</pre></div></div></div><div class=\"sk-parallel\"><div class=\"sk-parallel-item\"><div class=\"sk-item\"><div class=\"sk-label-container\"><div class=\"sk-label sk-toggleable\"><input class=\"sk-toggleable__control sk-hidden--visually\" id=\"sk-estimator-id-2\" type=\"checkbox\" ><label for=\"sk-estimator-id-2\" class=\"sk-toggleable__label sk-toggleable__label-arrow\">estimator: RandomForestClassifier</label><div class=\"sk-toggleable__content\"><pre>RandomForestClassifier(max_depth=10, min_samples_split=10, n_estimators=200,\n",
+       "                       random_state=42)</pre></div></div></div><div class=\"sk-serial\"><div class=\"sk-item\"><div class=\"sk-estimator sk-toggleable\"><input class=\"sk-toggleable__control sk-hidden--visually\" id=\"sk-estimator-id-3\" type=\"checkbox\" ><label for=\"sk-estimator-id-3\" class=\"sk-toggleable__label sk-toggleable__label-arrow\">RandomForestClassifier</label><div class=\"sk-toggleable__content\"><pre>RandomForestClassifier(max_depth=10, min_samples_split=10, n_estimators=200,\n",
+       "                       random_state=42)</pre></div></div></div></div></div></div></div></div></div></div>"
+      ],
+      "text/plain": [
+       "ThresholdOptimizer(constraints='equalized_odds',\n",
+       "                   estimator=RandomForestClassifier(max_depth=10,\n",
+       "                                                    min_samples_split=10,\n",
+       "                                                    n_estimators=200,\n",
+       "                                                    random_state=42),\n",
+       "                   objective='balanced_accuracy_score',\n",
+       "                   predict_method='predict_proba', prefit=True)"
+      ]
+     },
+     "execution_count": 92,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from fairlearn.postprocessing import ThresholdOptimizer\n",
+    "\n",
+    "postprocess_est = ThresholdOptimizer(\n",
+    "    estimator = rf_model,\n",
+    "    constraints = \"equalized_odds\",  # Optimize FPR and FNR simultaneously (wrong)\n",
+    "    # other constraints available: \"selection_rate_parity\", ’{false,true}_{positive,negative}_rate_parity’\n",
+    "    objective = \"balanced_accuracy_score\",\n",
+    "    prefit = True,\n",
+    "    predict_method = \"predict_proba\",\n",
+    ")\n",
+    "\n",
+    "postprocess_est"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 94,
+   "id": "443d383b-8507-4462-aa79-183cf8a03d97",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "X_train = df_train.drop(['ID', 'default payment next month'], axis = 1)\n",
+    "X_val = df_val.drop(['ID', 'default payment next month'], axis = 1)\n",
+    "y_train = df_train['default payment next month']\n",
+    "y_val = df_val['default payment next month']\n",
+    "sensitive_features_train = df_train.SEX\n",
+    "sensitive_features_val = df_val.SEX"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 95,
+   "id": "73e599f8-7283-4475-b0b4-6e15c2c4a659",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "postprocess_est.fit(X = X_train, y = y_train, sensitive_features = sensitive_features_train, random_seed = 42)\n",
+    "\n",
+    "postprocess_pred = postprocess_est.predict(X_val, sensitive_features = sensitive_features_val)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 96,
+   "id": "16cf3f14-96dd-4bda-bf54-871a84dfe94c",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Random Forest model: The algorithm has Equal Opportunity for both groups (male vs female).\n",
+      "\n",
+      "True Positive Rates:\n",
+      "Male: 0.368\n",
+      "Female: 0.627\n",
+      "Equal Opportunity Metric: -0.259\n"
+     ]
+    }
+   ],
+   "source": [
+    "# calculate Equal Opportunity Metric for the calibrated model\n",
+    "\n",
+    "male_tpr, female_tpr, equal_opp_metric = equal_opp(df_val,\n",
+    "                                                   postprocess_pred,\n",
+    "                                                   df_val['default payment next month'],\n",
+    "                                                   1,\n",
+    "                                                   2,\n",
+    "                                                   'SEX')\n",
+    "\n",
+    "# Compare true positive rates to assess fairness\n",
+    "if equal_opp_metric:\n",
+    "    print(\"Random Forest model: The algorithm has Equal Opportunity for both groups (male vs female).\")\n",
+    "else:\n",
+    "    print(\"Random Forest model: The algorithm does not have Equal Opportunity for both groups (male vs female).\")\n",
+    "\n",
+    "# Output true positive rates\n",
+    "print(\"\\nTrue Positive Rates:\")\n",
+    "print(\"Male: {:.3f}\".format(male_tpr))\n",
+    "print(\"Female: {:.3f}\".format(female_tpr))\n",
+    "print('Equal Opportunity Metric: {:.3f}'.format(equal_opp_metric))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Calibrated Equalized Odds Postprocessing (CEOP):\n",
+    "\n",
+    "O CEOP ajusta as probabilidades de previsão do classificador para garantir a igualdade de oportunidades. Ele faz isso calibrando as probabilidades de previsão para cada grupo (privilegiado e não privilegiado) para que tenham a mesma distribuição."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 98,
+   "id": "f0c25f39-4fbd-41a9-b4ba-2c1871017fd4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Calibrated Equalized Odds Postprocessing - Disparate Impact:  0.6123059709338724\n",
+      "Calibrated Equalized Odds Postprocessing - Average Odds Difference:  0.0\n"
+     ]
+    }
+   ],
+   "source": [
+    "from aif360.algorithms.postprocessing import CalibratedEqOddsPostprocessing\n",
+    "\n",
+    "# Prever usando o melhor modelo Random Forest\n",
+    "y_pred_best_rf = best_rf.predict(X_val)\n",
+    "binary_label_dataset_original = BinaryLabelDataset(df=df_val, \n",
+    "                                        label_names=['default payment next month'], \n",
+    "                                        protected_attribute_names=['SEX'],\n",
+    "                                        favorable_label=0, # non-default\n",
+    "                                        unfavorable_label=1, # default label\n",
+    "                                        )\n",
+    "# Converter as previsões para um conjunto de dados de rótulo binário\n",
+    "binary_label_dataset_predicted_best_rf = binary_label_dataset_original.copy()\n",
+    "binary_label_dataset_predicted_best_rf.labels = y_pred_best_rf\n",
+    "\n",
+    "# Inicializar o Calibrated Equalized Odds Postprocessing\n",
+    "ceop = CalibratedEqOddsPostprocessing(privileged_groups=privileged_groups,\n",
+    "                                      unprivileged_groups=unprivileged_groups,\n",
+    "                                      cost_constraint=\"fpr\")\n",
+    "\n",
+    "# Treinar o modelo CEOP\n",
+    "ceop.fit(binary_label_dataset_original, binary_label_dataset_predicted_best_rf)\n",
+    "\n",
+    "# Prever no conjunto de validação\n",
+    "binary_label_dataset_predicted_ceop = ceop.predict(binary_label_dataset_predicted_best_rf)\n",
+    "\n",
+    "# Calcular métricas de imparcialidade\n",
+    "classified_metric_ceop = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                              binary_label_dataset_predicted_ceop, \n",
+    "                                              unprivileged_groups=unprivileged_groups,\n",
+    "                                              privileged_groups=privileged_groups)\n",
+    "\n",
+    "di_ceop = BinaryLabelDatasetMetric(binary_label_dataset_predicted_ceop,\n",
+    "                                   unprivileged_groups=unprivileged_groups,\n",
+    "                                   privileged_groups=privileged_groups\n",
+    "                                  ).disparate_impact()\n",
+    "\n",
+    "aod_ceop = classified_metric_ceop.average_odds_difference()\n",
+    "\n",
+    "print(\"Calibrated Equalized Odds Postprocessing - Disparate Impact: \", di_ceop)\n",
+    "print(\"Calibrated Equalized Odds Postprocessing - Average Odds Difference: \", aod_ceop)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9ffe0ec1-894e-494b-9546-f59c11e96892",
+   "metadata": {},
+   "source": [
+    "### Reject Option Classification (ROC):\n",
+    "O ROC é uma técnica que modifica as previsões do classificador, rejeitando algumas delas com base em um limiar de confiança. Isso pode melhorar a justiça, especialmente quando há uma sobreposição nas distribuições de pontuação para os grupos privilegiados e não privilegiados."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 99,
+   "id": "c4ca8bc4-274f-4fc6-8fc4-d3f1c1ed8f80",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Reject Option Classification - Disparate Impact:  0.6123059709338724\n",
+      "Reject Option Classification - Average Odds Difference:  0.0\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "c:\\Users\\mateu\\anaconda3\\envs\\Sukuna\\Lib\\site-packages\\aif360\\algorithms\\postprocessing\\reject_option_classification.py:160: UserWarning: Unable to satisy fairness constraints\n",
+      "  warn(\"Unable to satisy fairness constraints\")\n"
+     ]
+    }
+   ],
+   "source": [
+    "from aif360.algorithms.postprocessing import RejectOptionClassification\n",
+    "\n",
+    "# Inicializar o Reject Option Classification\n",
+    "roc = RejectOptionClassification(unprivileged_groups=unprivileged_groups,\n",
+    "                                 privileged_groups=privileged_groups,\n",
+    "                                 low_class_thresh=0.01,\n",
+    "                                 high_class_thresh=0.99,\n",
+    "                                 num_class_thresh=100,\n",
+    "                                 num_ROC_margin=50,\n",
+    "                                 metric_name=\"Statistical parity difference\",\n",
+    "                                 metric_ub=0.05,\n",
+    "                                 metric_lb=-0.05)\n",
+    "\n",
+    "# Treinar o modelo ROC\n",
+    "roc.fit(binary_label_dataset_original, binary_label_dataset_predicted_best_rf)\n",
+    "\n",
+    "# Prever no conjunto de validação\n",
+    "binary_label_dataset_predicted_roc = roc.predict(binary_label_dataset_predicted_best_rf)\n",
+    "\n",
+    "# Calcular métricas de imparcialidade\n",
+    "classified_metric_roc = ClassificationMetric(binary_label_dataset_original,\n",
+    "                                             binary_label_dataset_predicted_roc, \n",
+    "                                             unprivileged_groups=unprivileged_groups,\n",
+    "                                             privileged_groups=privileged_groups)\n",
+    "\n",
+    "di_roc = BinaryLabelDatasetMetric(binary_label_dataset_predicted_roc,\n",
+    "                                  unprivileged_groups=unprivileged_groups,\n",
+    "                                  privileged_groups=privileged_groups\n",
+    "                                 ).disparate_impact()\n",
+    "\n",
+    "aod_roc = classified_metric_roc.average_odds_difference()\n",
+    "\n",
+    "print(\"Reject Option Classification - Disparate Impact: \", di_roc)\n",
+    "print(\"Reject Option Classification - Average Odds Difference: \", aod_roc)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a2e2a34d-a70b-4d56-a0a7-b2291f6117d4",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "714da418-fa28-4847-a694-9f5205eec80b",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "34eba252-2474-4395-b46b-6c4f56c8d7db",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "960a9a31-9f43-482f-a57e-ea0dbb34ae4f",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b22a3256-a723-445e-a0c8-4f1ae2834e3d",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1af42602-95f8-42ff-b970-ad8b4d4644ad",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "05c04943-2f0b-498b-a39a-3ffbdd1fb2de",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "263c157f-6e26-46ad-90d3-2de05598b603",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c68e408f-6e0a-4eb3-867d-73e63bd7a565",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2bbd2608-8b35-4346-8997-eaad26b694b4",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f50d90d2-ad08-423f-ab13-a78c45648fc8",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7863e639-708b-4054-a37e-35f730b86ca6",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "68e98a23-d7c9-495e-907d-67cd7b09162d",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1fee65c3-f8bd-480d-9a50-ad83cafa1c79",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fde5bbe3-9e0b-4fde-950d-7f3acb73a5ba",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "62243eab-6a91-487b-87c2-4def44f55a21",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0f0f49a5-ddbb-4093-b267-89eb08d07592",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b85eb4d2-65c7-4ab7-a79d-c31cad7077da",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "97201371-7a89-42dd-b9f2-6b4f6479c7dc",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0fe1ea30-329c-4a25-9e9a-956d87295ecd",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cf2b6c5a-8d07-4e01-b705-86f97a650257",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7f64f840-42d7-4c0e-84ac-9878ce29b724",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
